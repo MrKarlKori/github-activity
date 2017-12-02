@@ -174,11 +174,17 @@ var GitHubActivity = (function() {
 
       return text;
     },
-    getOutputFromRequest: function(url, callback) {
+    getOutputFromRequest: function(url, callback, repositories) {
       var request = new XMLHttpRequest();
-      request.open('GET', url);
-      request.setRequestHeader('Accept', 'application/vnd.github.v3+json');
-
+      if ( url.indexOf(".php") !== -1 ) {
+      	request.open('POST', url, true);
+      	request.setRequestHeader('Content-type', 'application/json; charset=utf-8');
+      	request.send(repositories);
+      } else {
+      	request.open('GET', url);
+      	request.setRequestHeader('Accept', 'application/vnd.github.v3+json');
+      	request.send();
+  	  }
       request.onreadystatechange = function() {
         if (request.readyState === 4) {
           if (request.status >= 200 && request.status < 300){
@@ -191,21 +197,7 @@ var GitHubActivity = (function() {
       };
 
       request.onerror = function() { callback('An error occurred connecting to ' + url); };
-      request.send();
-    },
-    
-    sendArrayToPhp: function(url, repositories) {
-      var request = new XMLHttpRequest();
-      request.open('POST', url, true);
-      request.setRequestHeader('Content-type', 'application/json; charset=utf-8');
-
-      request.onreadystatechange = function() {
-      	  if (request.readyState === 4) {
-           if (request.status !== 200) console.error("error");
-          }
-      };
-
-      request.send(repositories);
+      
     },
     
     renderStream: function(output, div) {
@@ -264,11 +256,6 @@ var GitHubActivity = (function() {
       }
     }
 
-    if (!!options.handler && !!options.repositories) {
-    	var repositories = JSON.stringify(options.repositories);
-    	methods.sendArrayToPhp(options.handler, repositories);
-    }
-
     methods.getOutputFromRequest(userUrl, function(error, output) {
       if (error) {
         header = Mustache.render(templates.UserNotFound, { username: options.username });
@@ -278,6 +265,11 @@ var GitHubActivity = (function() {
       methods.renderIfReady(selector, header, activity);
     });
 
+    if (!!options.handler && !!options.repositories) {
+    	var repositories = JSON.stringify(options.repositories);
+    	eventsUrl = options.handler;
+    }
+
     methods.getOutputFromRequest(eventsUrl, function(error, output) {
       if (error) {
         activity = Mustache.render(templates.EventsNotFound, { username: options.username });
@@ -286,7 +278,7 @@ var GitHubActivity = (function() {
         activity = methods.getActivityHTML(output, limit);
       }
       methods.renderIfReady(selector, header, activity);
-    });
+    }, repositories);
   };
 
   return obj;
